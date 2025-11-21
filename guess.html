@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Угадай число - Личный сайт</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css">
+</head>
+<body>
+    <div id="header">
+        <a href="index.html">Главная</a><span>/</span>
+        <a href="puzzles.html">Загадки</a><span>/</span>
+        <a href="guess.html" id="selected">Угадайка</a><span>/</span>
+        <a href="blog.html">Блог</a>
+    </div>
+
+    <div id="content">
+        <h1>Угадай число</h1>
+        <div class="game-container">
+            <div id="gameInfo">
+                <p>Я загадал число от 1 до 100. Попробуйте угадать его за 
+                   <span id="attemptsCount">7</span> попыток!</p>
+                
+                <div id="multiplayerInfo" style="display: none;">
+                    <p>Режим для двух игроков. Сейчас ход игрока 
+                       <span id="currentPlayer">1</span></p>
+                </div>
+            </div>
+            
+            <div class="form-group">
+                <label for="guessInput">Ваш вариант:</label>
+                <input type="number" id="guessInput" class="form-control" 
+                       min="1" max="100" placeholder="Введите число от 1 до 100">
+            </div>
+            
+            <button onclick="makeGuess()" class="btn">🎯 Сделать попытку</button>
+            <button onclick="restartGame()" class="btn btn-success">🔄 Новая игра</button>
+            
+            <div style="margin-top: 20px;">
+                <a href="guess.html" class="game-link">Одиночная игра</a>
+                <a href="guess.html?multiplayer=true" class="game-link">Игра для двух игроков</a>
+            </div>
+        </div>
+    </div>
+
+    <div id="footer">
+        <img src="ИИП.png" alt="ИПП" width="100" style="vertical-align: middle;">
+         <a href="https://iip.kg/" target="_blank">ИПП</a>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
