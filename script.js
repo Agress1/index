@@ -1,23 +1,46 @@
-// ==================== ОБЩИЕ ФУНКЦИИ ====================
+// ==================== УТИЛИТЫ ====================
+const $ = (selector) => document.querySelector(selector);
+const $$ = (selector) => document.querySelectorAll(selector);
 
-function showMessage(message, type = 'info') {
-    const messageDiv = document.createElement('div');
-    messageDiv.className = `result-message ${type === 'success' ? 'success' : type === 'error' ? 'error' : ''}`;
-    messageDiv.textContent = message;
-    
-    // Добавляем сообщение в начало body
-    document.body.insertBefore(messageDiv, document.body.firstChild);
-    
-    // Автоматически удаляем через 5 секунд
-    setTimeout(() => {
-        if (messageDiv.parentNode) {
-            messageDiv.remove();
-        }
-    }, 5000);
-}
+const showMessage = (message, type = 'info') => {
+    // Удаляем старое сообщение, если есть
+    $('.result-message')?.remove();
+
+    const messageEl = document.createElement('div');
+    messageEl.className = `result-message ${type}`;
+    messageEl.textContent = message;
+    messageEl.style.cssText = `
+        position: fixed;
+        top: 20px;
+        left: 50%;
+        transform: translateX(-50%);
+        z-index: 9999;
+        padding: 1rem 2rem;
+        border-radius: 12px;
+        font-weight: 600;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        animation: slideDown 0.4s ease;
+    `;
+
+    document.body.appendChild(messageEl);
+
+    setTimeout(() => messageEl.remove(), 5000);
+};
+
+// Анимация появления
+const style = document.createElement('style');
+style.textContent = `
+    @keyframes slideDown {
+        from { transform: translateX(-50%) translateY(-100px); opacity: 0; }
+        to   { transform: translateX(-50%) translateY(0); opacity: 1; }
+    }
+    .success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+    .error   { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+    .info    { background: #d1ecf1; color: #0c5460; border: 1px solid #bee5eb; }
+`;
+document.head.appendChild(style);
 
 // ==================== ИГРА "ЗАГАДКИ" ====================
-
 const puzzles = [
     { question: "Сто одежек и все без застежек", answer: "капуста" },
     { question: "Зимой и летом одним цветом", answer: "елка" },
@@ -26,281 +49,191 @@ const puzzles = [
     { question: "Что можно увидеть с закрытыми глазами?", answer: "сон" }
 ];
 
-function checkAnswer(inputId, correctAnswer) {
-    const inputElement = document.getElementById(inputId);
-    if (!inputElement) return false;
-    
-    const userAnswer = inputElement.value.trim().toLowerCase();
-    return userAnswer === correctAnswer.toLowerCase();
-}
-
-function checkAllAnswers() {
-    let correctCount = 0;
-    const totalPuzzles = puzzles.length;
-    
-    for (let i = 0; i < totalPuzzles; i++) {
-        const inputId = `answer${i + 1}`;  // Исправлено: шаблонная строка
-        const inputElement = document.getElementById(inputId);
-        
-        if (inputElement) {
-            if (checkAnswer(inputId, puzzles[i].answer)) {
-                correctCount++;
-                inputElement.style.borderColor = '#27ae60';
-                inputElement.style.backgroundColor = '#d4edda';
-            } else {
-                inputElement.style.borderColor = '#e74c3c';
-                inputElement.style.backgroundColor = '#f8d7da';
-            }
-        }
+class PuzzlesGame {
+    constructor() {
+        this.container = $('#puzzlesContainer');
+        if (!this.container) return;
+        this.render();
+        this.bindEnterEvents();
     }
-    
-    let message = '';
-    if (correctCount === totalPuzzles) {
-        message = `Поздравляем! Вы отгадали все ${totalPuzzles} загадок!`;
-        showMessage(message, 'success');
-    } else if (correctCount > 0) {
-        message = `Вы отгадали ${correctCount} из ${totalPuzzles} загадок`;
-        showMessage(message, 'info');
-    } else {
-        message = 'Вы не отгадали ни одной загадки. Попробуйте еще раз!';
-        showMessage(message, 'error');
-    }
-}
 
-function generatePuzzlesPage() {
-    const puzzlesContainer = document.getElementById('puzzlesContainer');
-    if (!puzzlesContainer) return;
-    
-    let puzzlesHTML = '';
-    
-    puzzles.forEach((puzzle, index) => {
-        puzzlesHTML += `
+    render() {
+        this.container.innerHTML = puzzles.map((p, i) => `
             <div class="puzzle-item">
-                <h4>Загадка ${index + 1}</h4>
-                <p>${puzzle.question}</p>
+                <h4>Загадка ${i + 1}</h4>
+                <p class="question">${p.question}</p>
                 <div class="form-group">
-                    <input type="text" 
-                           id="answer${index + 1}" 
-                           class="form-control" 
-                           placeholder="Введите ваш ответ...">
+                    <input type="text" id="answer${i + 1}" class="form-control" placeholder="Ваш ответ..." autocomplete="off">
                 </div>
             </div>
+        `).join('') + `
+            <div class="buttons" style="text-align: center; margin-top: 2rem;">
+                <button class="btn btn-success" onclick="puzzlesGame.check()">Проверить ответы</button>
+                <button class="btn" onclick="puzzlesGame.reset()" style="margin-left: 1rem;">Сбросить</button>
+            </div>
         `;
-    });
-    
-    puzzlesHTML += `
-        <div style="margin-top: 20px;">
-            <button onclick="checkAllAnswers()" class="btn btn-success">
-                Проверить ответы
-            </button>
-            <button onclick="resetPuzzles()" class="btn" style="margin-left: 10px;">
-                Начать заново
-            </button>
-        </div>
-    `;
-    
-    puzzlesContainer.innerHTML = puzzlesHTML;
-}
-
-function resetPuzzles() {
-    for (let i = 1; i <= puzzles.length; i++) {
-        const input = document.getElementById(`answer${i}`);  // Исправлено
-        if (input) {
-            input.value = '';
-            input.style.borderColor = '#bdc3c7';
-            input.style.backgroundColor = '';
-        }
     }
-    showMessage('Ответы очищены!', 'info');
+
+    check() {
+        let correct = 0;
+        puzzles.forEach((p, i) => {
+            const input = $(`#answer${i + 1}`);
+            const value = input.value.trim().toLowerCase();
+            const isCorrect = value === p.answer.toLowerCase();
+
+            input.style.transition = 'all 0.3s ease';
+            if (isCorrect) {
+                correct++;
+                input.style.borderColor = '#27ae60';
+                input.style.backgroundColor = '#d4edda';
+            } else {
+                input.style.borderColor = '#e74c3c';
+                input.style.backgroundColor = '#f8d7da';
+            }
+        });
+
+        const msg = correct === puzzles.length
+            ? `Браво! Все ${puzzles.length} загадок отгаданы!`
+            : correct > 0
+                ? `Отгадано: ${correct} из ${puzzles.length}`
+                : `Ни одной правильно. Попробуйте ещё!`;
+
+        showMessage(msg, correct === puzzles.length ? 'success' : correct > 0 ? 'info' : 'error');
+    }
+
+    reset() {
+        $$('#puzzlesContainer input').forEach(input => {
+            input.value = '';
+            input.style.borderColor = '';
+            input.style.backgroundColor = '';
+        });
+        showMessage('Поля очищены!', 'info');
+    }
+
+    bindEnterEvents() {
+        this.container.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') this.check();
+        });
+    }
 }
 
 // ==================== ИГРА "УГАДАЙ ЧИСЛО" ====================
+class GuessNumberGame {
+    constructor() {
+        this.input = $('#guessInput');
+        this.multiplayer = new URLSearchParams(location.search).get('multiplayer') === 'true';
+        if (!this.input) return;
 
-let secretNumber;
-let attemptsLeft;
-const totalAttempts = 7;
-let isMultiplayer = false;
-let currentPlayer = 1;
-
-function initializeGame() {
-    if (!document.getElementById('guessInput')) return;
-    
-    const urlParams = new URLSearchParams(window.location.search);
-    isMultiplayer = urlParams.get('multiplayer') === 'true';
-    
-    secretNumber = Math.floor(Math.random() * 100) + 1;
-    attemptsLeft = totalAttempts;
-    currentPlayer = 1;
-    
-    updateGameDisplay();
-    
-    if (isMultiplayer) {
-        showMessage(`Режим для двух игроков! Игрок ${currentPlayer}, ваша очередь!`, 'info');
-        const multiplayerInfo = document.getElementById('multiplayerInfo');
-        if (multiplayerInfo) multiplayerInfo.style.display = 'block';
-    } else {
-        showMessage(`Я загадал число от 1 до 100. У вас ${attemptsLeft} попыток!`, 'info');
-        const multiplayerInfo = document.getElementById('multiplayerInfo');
-        if (multiplayerInfo) multiplayerInfo.style.display = 'none';
+        this.totalAttempts = 7;
+        this.reset();
+        this.bindEvents();
+        this.updateDisplay();
+        showMessage(this.multiplayer
+            ? `Режим на двоих! Ход игрока ${this.currentPlayer}`
+            : `Загадано число от 1 до 100. У вас ${this.totalAttempts} попыток!`, 'info'
+        );
     }
-}
 
-function makeGuess() {
-    const guessInput = document.getElementById('guessInput');
-    if (!guessInput) return;
-    
-    const userGuess = parseInt(guessInput.value);
-    
-    if (isNaN(userGuess) || userGuess < 1 || userGuess > 100) {
-        showMessage('Пожалуйста, введите число от 1 до 100!', 'error');
-        return;
+    reset() {
+        this.secret = Math.floor(Math.random() * 100) + 1;
+        this.attemptsLeft = this.totalAttempts;
+        this.currentPlayer = 1;
+        this.gameOver = false;
+        this.input.disabled = false;
+        this.input.value = '';
+        this.updateDisplay();
+        $('#multiplayerInfo')?.style = this.multiplayer ? 'display: block' : 'display: none';
     }
-    
-    attemptsLeft--;
-    
-    let message = '';
-    if (userGuess === secretNumber) {
-        if (isMultiplayer) {
-            message = `Игрок ${currentPlayer} победил! Загаданное число: ${secretNumber}`;
-        } else {
-            message = `Поздравляем! Вы угадали число ${secretNumber} за ${totalAttempts - attemptsLeft} попыток!`;
+
+    makeGuess() {
+        if (this.gameOver) return;
+
+        const guess = parseInt(this.input.value);
+        if (isNaN(guess) || guess < 1 || guess > 100) {
+            showMessage('Введите число от 1 до 100!', 'error');
+            return;
         }
-        showMessage(message, 'success');
-        endGame();
-    } else if (attemptsLeft === 0) {
-        message = `Игра окончена! Загаданное число было: ${secretNumber}`;
-        showMessage(message, 'error');
-        endGame();
-    } else {
-        if (userGuess < secretNumber) {
-            message = 'Слишком маленькое число! Попробуйте больше.';
-        } else {
-            message = 'Слишком большое число! Попробуйте меньше.';
+
+        this.attemptsLeft--;
+
+        if (guess === this.secret) {
+            const attemptsUsed = this.totalAttempts - this.attemptsLeft;
+            const msg = this.multiplayer
+                ? `Игрок ${this.currentPlayer} угадал число ${this.secret} за ${attemptsUsed} попыток!`
+                : `Угадали с ${attemptsUsed} попытки! Число: ${this.secret}`;
+            showMessage(msg, 'success');
+            this.endGame();
+            return;
         }
-        
-        if (isMultiplayer) {
-            message += ` Осталось попыток: ${attemptsLeft} | Ход игрока ${currentPlayer === 1 ? 2 : 1}`;
-            currentPlayer = currentPlayer === 1 ? 2 : 1;
-        } else {
-            message += ` Осталось попыток: ${attemptsLeft}`;
+
+        if (this.attemptsLeft === 0) {
+            showMessage(`Попытки кончились! Было загадано: ${this.secret}`, 'error');
+            this.endGame();
+            return;
         }
-        
-        showMessage(message, 'info');
+
+        const hint = guess < this.secret ? 'мало' : 'много';
+        const playerHint = this.multiplayer
+            ? ` → Ход игрока ${this.currentPlayer === 1 ? 2 : 1}`
+            : '';
+
+        showMessage(`Слишком ${hint}! Осталось попыток: ${this.attemptsLeft}${playerHint}`, 'info');
+
+        if (this.multiplayer) this.currentPlayer = this.currentPlayer === 1 ? 2 : 1;
+
+        this.updateDisplay();
+        this.input.value = '';
+        this.input.focus();
     }
-    
-    guessInput.value = '';
-    updateGameDisplay();
-}
 
-function updateGameDisplay() {
-    const attemptsElement = document.getElementById('attemptsCount');
-    const playerElement = document.getElementById('currentPlayer');
-    
-    if (attemptsElement) attemptsElement.textContent = attemptsLeft;
-    if (playerElement) playerElement.textContent = currentPlayer;
-}
-
-function endGame() {
-    const guessInput = document.getElementById('guessInput');
-    const guessButton = document.querySelector('button[onclick="makeGuess()"]');
-    
-    if (guessInput) guessInput.disabled = true;
-    if (guessButton) guessButton.disabled = true;
-}
-
-function restartGame() {
-    const guessInput = document.getElementById('guessInput');
-    const guessButton = document.querySelector('button[onclick="makeGuess()"]');
-    
-    if (guessInput) {
-        guessInput.disabled = false;
-        guessInput.value = '';
-        guessInput.focus();
+    updateDisplay() {
+        $('#attemptsCount') && ($('#attemptsCount').textContent = this.attemptsLeft);
+        $('#currentPlayer') && ($('#currentPlayer').textContent = this.currentPlayer);
     }
-    if (guessButton) guessButton.disabled = false;
-    
-    initializeGame();
+
+    endGame() {
+        this.gameOver = true;
+        this.input.disabled = true;
+    }
+
+    bindEvents() {
+        this.input.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') this.makeGuess();
+        });
+    }
 }
 
 // ==================== БЛОГ ====================
-
 const blogPosts = [
-    {
-        id: 1,
-        title: "Мой опыт в программировании",
-        date: "2025-11-21",
-        content: "Сегодня я начал изучение JavaScript. Пока все кажется сложным."
-    },
-    {
-        id: 2,
-        title: "Почему я пошел как веб-разработку",
-        date: "2025-11-21",
-        content: "Я выбрал веб-разработку, потому что всегда хотел создавать что-то живое, осязаемое — то, что люди могут открыть в браузере и увидеть результат моей работы сразу же. Веб даёт именно эту магию: написал несколько строк кода — и уже появляется страница, кнопка, анимация, целое приложение. Мне нравится, что веб — это сочетание творчества и логики. С одной стороны, можно экспериментировать с дизайном, типографикой, интерфейсами. С другой — есть чёткая структура, правила, архитектура, которые нужно продумывать. Это идеальный баланс для человека, которому важны и красота, и порядок.Веб-разработка также привлекает своей динамичностью. Технологии постоянно развиваются, появляются новые фреймворки, подходы, инструменты. Здесь невозможно заскучать: всегда есть что изучать, чем улучшить себя и свои проекты. Это место, где рост — не побочный эффект, а естественная часть пути.Кроме того, веб — это свобода. Можно работать удалённо, создавать собственные проекты, участвовать в стартапах, разрабатывать сервисы, которые помогают людям. Веб открывает множество дверей — нужно лишь выбрать, через какую пойти.И, пожалуй, главное: мне нравится ощущение, что я создаю что-то полезное. Сайты, сервисы, интерфейсы — всё это становится частью чьей-то повседневной жизни. И знать, что твой код кому-то помогает — это отличная мотивация двигаться дальше."
-    },
-    {
-        id: 3,
-        title: "Сложности в изучении CSS",
-        date: "2025-11-21",
-        content: "Cначала казались магией, но после практики все встало на свои места. Главное - не бояться экспериментировать и постоянно практиковаться"
-    }
+    { id: 1, title: "Мой опыт в программировании", date: "2025-11-21", content: "Сегодня я начал изучение JavaScript. Пока все кажется сложным." },
+    { id: 2, title: "Почему я выбрал веб-разработку", date: "2025-11-21", content: "Я выбрал веб-разработку, потому что всегда хотел создавать что-то живое, осязаемое — то, что люди могут открыть в браузере и увидеть результат моей работы сразу же..." },
+    { id: 3, title: "Сложности в изучении CSS", date: "2025-11-21", content: "Сначала казались магией, но после практики всё встало на свои места. Главное — не бояться экспериментировать!" }
 ];
 
-function loadBlogPosts() {
-    const blogContainer = document.getElementById('blogContainer');
-    if (!blogContainer) return;
-    
-    let blogHTML = '';
-    
-    blogPosts.forEach(post => {
-        blogHTML += `
-            <div class="blog-post" style="margin-bottom: 30px; padding: 20px; border: 1px solid #ddd; border-radius: 5px;">
-                <h3 style="color: #2c3e50; margin-bottom: 10px;">${post.title}</h3>
-                <em style="color: #7f8c8d;">Опубликовано: ${post.date}</em>
-                <p style="margin-top: 15px; line-height: 1.6;">${post.content}</p>
-            </div>
-        `;
-    });
-    
-    blogContainer.innerHTML = blogHTML;
-}
+const renderBlog = () => {
+    const container = $('#blogContainer');
+    if (!container) return;
+
+    container.innerHTML = blogPosts.map(post => `
+        <article class="blog-post">
+            <h3>${post.title}</h3>
+            <time datetime="${post.date}">${new Date(post.date).toLocaleDateString('ru-RU')}</time>
+            <p>${post.content}</p>
+        </article>
+    `).join('');
+};
 
 // ==================== ИНИЦИАЛИЗАЦИЯ ====================
+document.addEventListener('DOMContentLoaded', () => {
+    console.log('DOM загружен – запускаем игры и блог');
 
-document.addEventListener('DOMContentLoaded', function() {
-    console.log('DOM загружен, инициализируем приложение...');
-    
-    generatePuzzlesPage();
-    
-    if (document.getElementById('guessInput')) {
-        console.log('Инициализируем игру "Угадай число"');
-        initializeGame();
-    }
-    
-    loadBlogPosts();
-    
-    // Enter в поле угадайки
-    const guessInput = document.getElementById('guessInput');
-    if (guessInput) {
-        guessInput.addEventListener('keypress', function(e) {
-            if (e.key === 'Enter') makeGuess();
-        });
-    }
-    
-    // Enter в полях загадок
-    for (let i = 1; i <= puzzles.length; i++) {
-        const input = document.getElementById(`answer${i}`);
-        if (input) {
-            input.addEventListener('keypress', function(e)
-            {
-                if (e.key === 'Enter') checkAllAnswers();
-            });
-        }
-    }
+    window.puzzlesGame = new PuzzlesGame();
+    window.guessGame = new GuessNumberGame();
+    renderBlog();
+
+    // Глобальные функции для кнопок в HTML
+    window.checkAllAnswers = () => puzzlesGame?.check();
+    window.resetPuzzles = () => puzzlesGame?.reset();
+    window.makeGuess = () => guessGame?.makeGuess();
+    window.restartGame = () => guessGame?.reset();
 });
-
-// Экспортируем функции в глобальную область
-window.showMessage = showMessage;
-window.checkAllAnswers = checkAllAnswers;
-window.resetPuzzles = resetPuzzles;
-window.makeGuess = makeGuess;
-window.restartGame = restartGame;
