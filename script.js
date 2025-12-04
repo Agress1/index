@@ -2,45 +2,27 @@
 const $ = (selector) => document.querySelector(selector);
 const $$ = (selector) => document.querySelectorAll(selector);
 
+// Красивое уведомление (без дублирования стилей)
 const showMessage = (message, type = 'info') => {
-    // Удаляем старое сообщение, если есть
     $('.result-message')?.remove();
 
-    const messageEl = document.createElement('div');
-    messageEl.className = `result-message ${type}`;
-    messageEl.textContent = message;
-    messageEl.style.cssText = `
-        position: fixed;
-        top: 20px;
-        left: 50%;
-        transform: translateX(-50%);
-        z-index: 9999;
-        padding: 1rem 2rem;
-        border-radius: 12px;
-        font-weight: 600;
-        box-shadow: 0 10px 30px rgba(0,0,0,0.2);
-        animation: slideDown 0.4s ease;
-    `;
+    const toast = document.createElement('div');
+    toast.className = `result-message ${type}`;
+    toast.textContent = message;
 
-    document.body.appendChild(messageEl);
+    document.body.appendChild(toast);
 
-    setTimeout(() => messageEl.remove(), 5000);
+    // Принудительный reflow для анимации
+    toast.offsetHeight;
+    toast.classList.add('show');
+
+    setTimeout(() => {
+        toast.classList.remove('show');
+        toast.addEventListener('transitionend', () => toast.remove(), { once: true });
+    }, 4500);
 };
 
-// Анимация появления
-const style = document.createElement('style');
-style.textContent = `
-    @keyframes slideDown {
-        from { transform: translateX(-50%) translateY(-100px); opacity: 0; }
-        to   { transform: translateX(-50%) translateY(0); opacity: 1; }
-    }
-    .success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
-    .error   { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
-    .info    { background: #d1ecf1; color: #0c5460; border: 1px solid #bee5eb; }
-`;
-document.head.appendChild(style);
-
-// ==================== ИГРА "ЗАГАДКИ" ====================
+// ==================== ИГРЫ ====================
 const puzzles = [
     { question: "Сто одежек и все без застежек", answer: "капуста" },
     { question: "Зимой и летом одним цветом", answer: "елка" },
@@ -49,12 +31,15 @@ const puzzles = [
     { question: "Что можно увидеть с закрытыми глазами?", answer: "сон" }
 ];
 
+// Глобальные экземпляры (будут созданы после загрузки)
+let puzzlesGame, guessGame;
+
+// ==================== ИГРА "ЗАГАДКИ" ====================
 class PuzzlesGame {
     constructor() {
         this.container = $('#puzzlesContainer');
         if (!this.container) return;
         this.render();
-        this.bindEnterEvents();
     }
 
     render() {
@@ -67,11 +52,18 @@ class PuzzlesGame {
                 </div>
             </div>
         `).join('') + `
-            <div class="buttons" style="text-align: center; margin-top: 2rem;">
-                <button class="btn btn-success" onclick="puzzlesGame.check()">Проверить ответы</button>
-                <button class="btn" onclick="puzzlesGame.reset()" style="margin-left: 1rem;">Сбросить</button>
+            <div style="text-align: center; margin-top: 2rem;">
+                <button type="button" class="btn btn-success">Проверить ответы</button>
+                <button type="button" class="btn" style="margin-left: 1rem;">Сбросить</button>
             </div>
         `;
+
+        // Навешиваем обработчики уже после вставки HTML
+        this.container.querySelector('.btn-success').addEventListener('click', () => this.check());
+        this.container.querySelector('.btn').addEventListener('click', () => this.reset());
+        this.container.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') this.check();
+        });
     }
 
     check() {
@@ -109,24 +101,25 @@ class PuzzlesGame {
         });
         showMessage('Поля очищены!', 'info');
     }
-
-    bindEnterEvents() {
-        this.container.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') this.check();
-        });
-    }
 }
 
 // ==================== ИГРА "УГАДАЙ ЧИСЛО" ====================
 class GuessNumberGame {
     constructor() {
         this.input = $('#guessInput');
-        this.multiplayer = new URLSearchParams(location.search).get('multiplayer') === 'true';
         if (!this.input) return;
 
         this.totalAttempts = 7;
+        this.multiplayer = new URLSearchParams(location.search).get('multiplayer') === 'true';
         this.reset();
-        this.bindEvents();
+
+        // Навешиваем события
+        $('#guessButton')?.addEventListener('click', () => this.makeGuess());
+        $('#restartButton')?.addEventListener('click', () => this.reset());
+        this.input.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') this.makeGuess();
+        });
+
         this.updateDisplay();
         showMessage(this.multiplayer
             ? `Режим на двоих! Ход игрока ${this.currentPlayer}`
@@ -139,10 +132,15 @@ class GuessNumberGame {
         this.attemptsLeft = this.totalAttempts;
         this.currentPlayer = 1;
         this.gameOver = false;
+
         this.input.disabled = false;
         this.input.value = '';
+        this.input.focus();
+
+        const info = $('#multiplayerInfo');
+        if (info) info.style.display = this.multiplayer ? 'block' : 'none';
+
         this.updateDisplay();
-        $('#multiplayerInfo')?.style = this.multiplayer ? 'display: block' : 'display: none';
     }
 
     makeGuess() {
@@ -157,11 +155,13 @@ class GuessNumberGame {
         this.attemptsLeft--;
 
         if (guess === this.secret) {
-            const attemptsUsed = this.totalAttempts - this.attemptsLeft;
-            const msg = this.multiplayer
-                ? `Игрок ${this.currentPlayer} угадал число ${this.secret} за ${attemptsUsed} попыток!`
-                : `Угадали с ${attemptsUsed} попытки! Число: ${this.secret}`;
-            showMessage(msg, 'success');
+            const used = this.totalAttempts - this.attemptsLeft;
+            showMessage(
+                this.multiplayer
+                    ? `Игрок ${this.currentPlayer} победил за ${used} ${used === 1 ? 'попытку' : 'попыток'}!`
+                    : `Угадали за ${used} ${used === 1 ? 'попытку' : 'попыток'}! Число: ${this.secret}`,
+                'success'
+            );
             this.endGame();
             return;
         }
@@ -173,14 +173,10 @@ class GuessNumberGame {
         }
 
         const hint = guess < this.secret ? 'мало' : 'много';
-        const playerHint = this.multiplayer
-            ? ` → Ход игрока ${this.currentPlayer === 1 ? 2 : 1}`
-            : '';
-
-        showMessage(`Слишком ${hint}! Осталось попыток: ${this.attemptsLeft}${playerHint}`, 'info');
+        const next = this.multiplayer ? ` → Ход игрока ${this.currentPlayer === 1 ? 2 : 1}` : '';
+        showMessage(`Слишком ${hint}! Осталось попыток: ${this.attemptsLeft}${next}`, 'info');
 
         if (this.multiplayer) this.currentPlayer = this.currentPlayer === 1 ? 2 : 1;
-
         this.updateDisplay();
         this.input.value = '';
         this.input.focus();
@@ -195,19 +191,13 @@ class GuessNumberGame {
         this.gameOver = true;
         this.input.disabled = true;
     }
-
-    bindEvents() {
-        this.input.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') this.makeGuess();
-        });
-    }
 }
 
 // ==================== БЛОГ ====================
 const blogPosts = [
-    { id: 1, title: "Мой опыт в программировании", date: "2025-11-21", content: "Сегодня я начал изучение JavaScript. Пока все кажется сложным." },
-    { id: 2, title: "Почему я выбрал веб-разработку", date: "2025-11-21", content: "Я выбрал веб-разработку, потому что всегда хотел создавать что-то живое, осязаемое — то, что люди могут открыть в браузере и увидеть результат моей работы сразу же..." },
-    { id: 3, title: "Сложности в изучении CSS", date: "2025-11-21", content: "Сначала казались магией, но после практики всё встало на свои места. Главное — не бояться экспериментировать!" }
+    { id: 1, title: "Мой опыт в программировании", date: "2025-11-21", content: "Сегодня я начал изучение JavaScript. Пока всё кажется сложным, но я не сдаюсь!" },
+    { id: 2, title: "Почему я выбрал веб-разработку", date: "2025-11-21", content: "Веб — это магия: написал код — и сразу видишь результат в браузере..." },
+    { id: 3, title: "Сложности в изучении CSS", date: "2025-11-21", content: "Сначала Flexbox и Grid казались чёрной магией, но после 100 часов практики — всё стало на свои места!" }
 ];
 
 const renderBlog = () => {
@@ -217,21 +207,51 @@ const renderBlog = () => {
     container.innerHTML = blogPosts.map(post => `
         <article class="blog-post">
             <h3>${post.title}</h3>
-            <time datetime="${post.date}">${new Date(post.date).toLocaleDateString('ru-RU')}</time>
+            <time datetime="${post.date}">${new Date(post.date).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' })}</time>
             <p>${post.content}</p>
         </article>
     `).join('');
 };
 
+// ==================== ДОБАВЬ ЭТО В CSS (важно!) ====================
+const toastCSS = `
+    .result-message {
+        position: fixed;
+        top: 20px;
+        left: 50%;
+        transform: translateX(-50%) translateY(-100px);
+        min-width: 300px;
+        padding: 1rem 2rem;
+        border-radius: 16px;
+        font-weight: 600;
+        text-align: center;
+        box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+        z-index: 9999;
+        opacity: 0;
+        transition: all 0.4s cubic-bezier(0.68, -0.55, 0.27, 1.55);
+        pointer-events: none;
+    }
+    .result-message.show {
+        opacity: 1;
+        transform: translateX(-50%) translateY(0);
+    }
+    .result-message.success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+    .result-message.error   { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+    .result-message.info    { background: #d1ecf1; color: #0c5460; border: 1px solid #bee5eb; }
+`;
+const styleTag = document.createElement('style');
+styleTag.textContent = toastCSS;
+document.head.appendChild(styleTag);
+
 // ==================== ИНИЦИАЛИЗАЦИЯ ====================
 document.addEventListener('DOMContentLoaded', () => {
-    console.log('DOM загружен – запускаем игры и блог');
+    console.log('DOM загружен — запускаем всё');
 
-    window.puzzlesGame = new PuzzlesGame();
-    window.guessGame = new GuessNumberGame();
+    puzzlesGame = new PuzzlesGame();
+    guessGame = new GuessNumberGame();
     renderBlog();
 
-    // Глобальные функции для кнопок в HTML
+    // Глобальные функции (для data-атрибутов или старых кнопок)
     window.checkAllAnswers = () => puzzlesGame?.check();
     window.resetPuzzles = () => puzzlesGame?.reset();
     window.makeGuess = () => guessGame?.makeGuess();
